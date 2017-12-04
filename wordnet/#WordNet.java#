@@ -1,0 +1,129 @@
+import java.util.ArrayList;
+import java.util.HashMap;
+import edu.princeton.cs.algs4.*;
+
+/**
+ *  The Wordnet class build the wordnet directed graph and provides methods.
+ *  Each vertex v is an integer that represents a synset, and each directed edge v→w represents that w is a hypernym of v.
+ *  @author Fernando Franco
+ */
+
+public class WordNet {
+    
+    private HashMap<String, ArrayList<Integer>> nounsToSynsetsId = new HashMap<String, ArrayList<Integer>>();
+    private HashMap<Integer, String> idToSynsetNouns = new HashMap<Integer, String>(); 
+    
+    private Digraph graph; 
+    
+    private int vertices;
+    private SAP sap;
+    
+    /**
+     * Parse synset file building a list of synsets and nouns. 
+     * 
+     * @param synsets file name.
+     */
+    private void parseSynsets(String synsets) {
+        In in = new In(synsets);
+        
+        while (in.hasNextLine()) {
+            String line = in.readLine(); 
+            String[] lineElements = line.split(","); // split line in ids [0], nouns [1] and definitions [2]
+            
+            int synsetId = Integer.parseInt(lineElements[0]); //get synset id
+            idToSynsetNouns.put(synsetId, lineElements[1]);
+            
+            String[] synsetNouns = lineElements[1].split(" "); // get all the synset nouns
+            
+            //Add the current synset id to each node
+            for (String noun : synsetNouns) {         
+                ArrayList<Integer> currentNounsList = (nounsToSynsetsId.containsKey(noun)) ? nounsToSynsetsId.get(noun) : new ArrayList<Integer>();
+		currentNounsList.add(synsetId); 
+                nounsToSynsetsId.put(noun, currentNounsList);
+            }
+            
+            
+        }
+        vertices = idToSynsetNouns.size(); 
+    }
+    
+    /**
+     * Build a graph with an edge between each synset and its hypernyms
+     * 
+     * @param synsets
+     */
+    private void parseHypernyms(String hypernym) {
+        graph = new Digraph(vertices);
+        
+        In file = new In(hypernym);
+        while (file.hasNextLine()) {
+            String[] hypernyms = file.readLine().split(",");
+            int synsetId = Integer.parseInt(hypernyms[0]);
+            for (int i = 1; i < hypernyms.length; i++) {
+                 id = Integer.parseInt(hypernyms[i]);
+                graph.addEdge(synsetId, id);
+            }
+        }
+    }
+    
+    
+    // constructor takes the name of the two input files
+    public WordNet(String synsets, String hypernyms) {
+        // Process data files
+        parseSynsets(synsets);
+        parseHypernyms(hypernyms);
+        
+        // Check for cycles
+        DirectedCycle cycle = new DirectedCycle(graph);
+        if (cycle.hasCycle()) {
+            throw new IllegalArgumentException("Not a valid DAG");
+        }
+        
+        // Check if not rooted
+        int root = 0;
+        for (int i = 0; i < vertices; i++) {
+            if (!graph.adj(i).iterator().hasNext())
+                root++;
+        }
+        
+        if (root != 1) {
+            throw new IllegalArgumentException("Not a rooted DAG");
+        }
+        
+        sap = new SAP(graph);
+    }
+    
+    // returns all WordNet nouns
+    public Iterable<String> nouns() {
+        return nounsToSynsetsId.keySet();
+    }
+    
+    // is the word a WordNet noun?
+    public boolean isNoun(String word) {
+        return nounsToSynsetsId.containsKey(word);
+    }
+    
+    // distance between nounA and nounB (defined below)
+    public int distance(String nounA, String nounB) {
+        if(!nounsToSynsetsId.containsKey(nounA) || !nounsToSynsetsId.containsKey(nounB))
+            throw new IllegalArgumentException("Not a valid pair of nouns");
+        
+        return sap.length(nounsToSynsetsId.get(nounA), nounsToSynsetsId.get(nounB));
+    }
+    
+    // a synset (second field of synsets.txt) that is the common ancestor of nounA and nounB
+    // in a shortest ancestral path (defined below)
+    public String sap(String nounA, String nounB) {
+        if(!nounsToSynsetsId.containsKey(nounA) || !nounsToSynsetsId.containsKey(nounB))
+            throw new IllegalArgumentException("Not a valid pair of nouns");
+        
+        int ancestor = sap.ancestor(nounsToSynsetsId.get(nounA), nounsToSynsetsId.get(nounB));
+        
+        return idToSynsetNouns.get(ancestor);
+    }
+    
+    // do unit testing of this class
+    public static void main(String[] args) {
+        
+    }
+}
